@@ -42,10 +42,12 @@ class OpenAIResponsesClient:
             supplier_summary = self._summarize_supplier_data(context_data)
             input_content = f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\nPREGUNTA DEL USUARIO: {input_text}"
         
-        # Use your dashboard prompt ID - all config values are handled by dashboard
+        # Use your dashboard prompt ID - prompt parameter expects an object
         payload = {
             "model": "gpt-4.1-mini",  # Your dashboard model
-            "prompt": CREDIFLEX_PROMPT_ID,  # Your dashboard prompt ID
+            "prompt": {
+                "id": CREDIFLEX_PROMPT_ID  # Prompt ID wrapped in object
+            },
             "input": input_content  # Just the user input
         }
         
@@ -449,7 +451,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": int(datetime.now().timestamp()),
         "active_threads": len(THREAD_STORAGE),
-        "api_version": "2.0 (Prompt ID Only)",
+        "api_version": "2.0 (Fixed Prompt Object)",
         "prompt_id": CREDIFLEX_PROMPT_ID
     }
 
