@@ -42,33 +42,11 @@ class OpenAIResponsesClient:
             supplier_summary = self._summarize_supplier_data(context_data)
             input_content = f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\nPREGUNTA DEL USUARIO: {input_text}"
         
+        # Use your dashboard prompt ID - all config values are handled by dashboard
         payload = {
-            "model": "gpt-4.1-mini",  # Using your dashboard model
-            "input": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "input_text",
-                            "text": input_content
-                        }
-                    ]
-                }
-            ],
-            "text": {
-                "format": {
-                    "type": "text"
-                }
-            },
-            "reasoning": {},
-            "tools": [],
-            "temperature": 1.00,  # Using your dashboard temperature
-            "max_output_tokens": 2048,  # Using your dashboard max tokens
-            "top_p": 1.00,  # Using your dashboard top_p
-            "store": True,  # Using your dashboard store setting
-            "include": ["web_search_call.action.sources"],
-            # Reference your custom prompt from the dashboard
-            "prompt_id": CREDIFLEX_PROMPT_ID
+            "model": "gpt-4.1-mini",  # Your dashboard model
+            "prompt": CREDIFLEX_PROMPT_ID,  # Your dashboard prompt ID
+            "input": input_content  # Just the user input
         }
         
         async with httpx.AsyncClient() as client:
@@ -259,7 +237,7 @@ async def chat_endpoint(request_data: Dict):
             "response": response_text,
             "thread_id": thread_id,
             "timestamp": int(datetime.now().timestamp()),
-            "model": "gpt-4.1-mini (Dashboard Prompt)",
+            "model": "gpt-4.1-mini (Dashboard Configured)",
             "status": "success",
             "openai_response_id": response_data.get("id")
         }
@@ -471,7 +449,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": int(datetime.now().timestamp()),
         "active_threads": len(THREAD_STORAGE),
-        "api_version": "2.0 (Dashboard Prompt)",
+        "api_version": "2.0 (Prompt ID Only)",
         "prompt_id": CREDIFLEX_PROMPT_ID
     }
 
