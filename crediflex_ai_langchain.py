@@ -1,5 +1,7 @@
 # crediflex_ai_langchain.py
 import os
+import uuid
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -15,6 +17,10 @@ import json
 
 # Configuración
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Simple thread storage (in production, use Redis or database)
+THREAD_STORAGE = {}
+THREAD_EXPIRY_HOURS = 24
 
 # Sistema de prompt
 SYSTEM_PROMPT = """Eres un asistente especializado para usuarios del dashboard de proveedores de CrediFlex.
@@ -69,6 +75,55 @@ Cuando te pidan listar clientes por status, organiza así:
 **RECHAZADOS (X):**
 - Nombre Cliente 4
 """
+
+# Simple thread management functions
+def create_thread():
+    """Create a new conversation thread"""
+    thread_id = str(uuid.uuid4())
+    THREAD_STORAGE[thread_id] = {
+        "created_at": datetime.now(),
+        "last_activity": datetime.now(),
+        "messages": []
+    }
+    return thread_id
+
+def get_thread(thread_id):
+    """Get thread data"""
+    return THREAD_STORAGE.get(thread_id)
+
+def update_thread(thread_id, user_message, assistant_response):
+    """Update thread with new messages"""
+    if thread_id not in THREAD_STORAGE:
+        return
+    
+    thread = THREAD_STORAGE[thread_id]
+    thread["last_activity"] = datetime.now()
+    
+    # Add messages to thread
+    thread["messages"].append({
+        "role": "user",
+        "content": user_message,
+        "timestamp": datetime.now().isoformat()
+    })
+    thread["messages"].append({
+        "role": "assistant", 
+        "content": assistant_response,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    # Keep only last 20 messages to prevent context overflow
+    if len(thread["messages"]) > 20:
+        thread["messages"] = thread["messages"][-20:]
+
+def cleanup_expired_threads():
+    """Remove expired threads"""
+    expired_time = datetime.now() - timedelta(hours=THREAD_EXPIRY_HOURS)
+    expired_threads = [
+        thread_id for thread_id, data in THREAD_STORAGE.items()
+        if data["last_activity"] < expired_time
+    ]
+    for thread_id in expired_threads:
+        del THREAD_STORAGE[thread_id]
 
 def summarize_supplier_data(data: Dict) -> str:
     try:
@@ -201,19 +256,47 @@ add_routes(
 @app.post("/chat")
 async def chat_endpoint(request_data: Dict):
     try:
+        # Check if thread_id is provided
+        thread_id = request_data.get("thread_id")
+        
+        # If thread_id provided, get conversation history from thread
+        if thread_id and get_thread(thread_id):
+            thread = get_thread(thread_id)
+            # Convert thread messages to conversation_history format
+            conversation_history = []
+            for msg in thread["messages"]:
+                conversation_history.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            request_data["conversation_history"] = conversation_history
+        
         # Procesar input
         processed_input = process_input(request_data)
         
         # Ejecutar chain
         response = await crediflex_chain.ainvoke(processed_input)
         
-        return {
+        result = {
             "response": response,
             "supplier_summary": processed_input["supplier_summary"],
-            "timestamp": 1234567890,
+            "timestamp": int(datetime.now().timestamp()),
             "model": "CrediFlex AI with LangChain",
             "status": "success"
         }
+        
+        # If successful and we have a thread, update it
+        if thread_id:
+            update_thread(thread_id, request_data.get("query", ""), response)
+            result["thread_id"] = thread_id
+        elif not thread_id:
+            # Create new thread for successful responses
+            new_thread_id = create_thread()
+            update_thread(new_thread_id, request_data.get("query", ""), response)
+            result["thread_id"] = new_thread_id
+        
+        return result
+        
     except Exception as e:
         return {
             "error": str(e),
@@ -360,6 +443,55 @@ async def test_endpoint(request_data: Dict):
     }
     
     return await chat_endpoint(demo_data)
+
+# Additional thread management endpoints (optional)
+@app.get("/threads/{thread_id}")
+async def get_thread_info(thread_id: str):
+    """Get thread information"""
+    thread = get_thread(thread_id)
+    if not thread:
+        return {"error": "Thread not found", "status": "error"}
+    
+    return {
+        "thread_id": thread_id,
+        "created_at": thread["created_at"].isoformat(),
+        "last_activity": thread["last_activity"].isoformat(),
+        "message_count": len(thread["messages"]),
+        "status": "success"
+    }
+
+@app.delete("/threads/{thread_id}")
+async def delete_thread(thread_id: str):
+    """Delete a thread"""
+    if thread_id not in THREAD_STORAGE:
+        return {"error": "Thread not found", "status": "error"}
+    
+    del THREAD_STORAGE[thread_id]
+    return {"message": "Thread deleted successfully", "status": "success"}
+
+@app.get("/threads")
+async def list_threads():
+    """List all active threads"""
+    cleanup_expired_threads()
+    threads = []
+    for thread_id, data in THREAD_STORAGE.items():
+        threads.append({
+            "thread_id": thread_id,
+            "created_at": data["created_at"].isoformat(),
+            "last_activity": data["last_activity"].isoformat(),
+            "message_count": len(data["messages"])
+        })
+    
+    return {"threads": threads, "status": "success"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "timestamp": int(datetime.now().timestamp()),
+        "active_threads": len(THREAD_STORAGE)
+    }
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
