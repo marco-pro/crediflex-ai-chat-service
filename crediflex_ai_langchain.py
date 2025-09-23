@@ -68,56 +68,56 @@ class OpenAIResponsesClient:
     
     def _summarize_supplier_data(self, data: Dict) -> str:
         """Summarize supplier data for context"""
-    try:
-        business_clients = data.get('business_clients', [])
-        
+        try:
+            business_clients = data.get('business_clients', [])
+            
             # Group clients by status
-        status_groups = {}
-        for client in business_clients:
-            status = client.get('approval_status', 'unknown')
-            if status not in status_groups:
-                status_groups[status] = []
-            status_groups[status].append({
-                'name': client.get('company_name', 'Sin nombre'),
-                'email': client.get('email', ''),
-                'credit_limit': client.get('credit', {}).get('credit_limit', 0)
-            })
+            status_groups = {}
+            for client in business_clients:
+                status = client.get('approval_status', 'unknown')
+                if status not in status_groups:
+                    status_groups[status] = []
+                status_groups[status].append({
+                    'name': client.get('company_name', 'Sin nombre'),
+                    'email': client.get('email', ''),
+                    'credit_limit': client.get('credit', {}).get('credit_limit', 0)
+                })
 
-        summary = f"""
+            summary = f"""
 RESUMEN DEL PROGRAMA DE CRÉDITO:
 
 CLIENTES POR STATUS DE APROBACIÓN:
 """
-        
-        for status, clients in status_groups.items():
-            status_name = {
-                'active': 'ACTIVOS',
-                'pending': 'PENDIENTES', 
-                'rejected': 'RECHAZADOS',
-                'suspended': 'SUSPENDIDOS'
-            }.get(status, status.upper())
             
-            summary += f"{status_name} ({len(clients)}):\n"
-            for client in clients:
-                summary += f"  • {client['name']}\n"
-            summary += "\n"
-        
+            for status, clients in status_groups.items():
+                status_name = {
+                    'active': 'ACTIVOS',
+                    'pending': 'PENDIENTES', 
+                    'rejected': 'RECHAZADOS',
+                    'suspended': 'SUSPENDIDOS'
+                }.get(status, status.upper())
+                
+                summary += f"{status_name} ({len(clients)}):\n"
+                for client in clients:
+                    summary += f"  • {client['name']}\n"
+                summary += "\n"
+            
             # Rest of metrics...
-        orders = data.get('orders', [])
-        settlements = data.get('settlements', [])
-        
-        total_revenue = sum(p.get('amount', 0) for p in settlements)
-        summary += f"""
+            orders = data.get('orders', [])
+            settlements = data.get('settlements', [])
+            
+            total_revenue = sum(p.get('amount', 0) for p in settlements)
+            summary += f"""
 MÉTRICAS GENERALES:
 - Total clientes: {len(business_clients)}
 - Ingresos totales: ${total_revenue:,.2f}
 - Órdenes procesadas: {len(orders)}
 """
-        
-        return summary
+            
+            return summary
 
-    except Exception as e:
-        return f"Error procesando datos: {str(e)}"
+        except Exception as e:
+            return f"Error procesando datos: {str(e)}"
 
 # Thread management functions
 def create_thread():
@@ -205,7 +205,7 @@ async def chat_endpoint(request_data: Dict):
             thread_id = create_thread()
         
         # Get thread data
-            thread = get_thread(thread_id)
+        thread = get_thread(thread_id)
         
         # Get user query
         query = request_data.get("query", "")
@@ -274,130 +274,130 @@ async def test_endpoint(request_data: Dict):
         "context": {
             "business_clients": [
                 {
-                "client_id": "cli_9876543210.1111",
-                "company_name": "METRO CONSTRUCTION LLC",
-                "email": "finance@metroconstruction.com",
-                "phone": "+1-555-0123",
-                "approval_status": "active",
-                "credit": {
-                    "credit_limit": 100000,
-                    "credit_used": 75000
-                }
+                    "client_id": "cli_9876543210.1111",
+                    "company_name": "METRO CONSTRUCTION LLC",
+                    "email": "finance@metroconstruction.com",
+                    "phone": "+1-555-0123",
+                    "approval_status": "active",
+                    "credit": {
+                        "credit_limit": 100000,
+                        "credit_used": 75000
+                    }
                 },
                 {
-                "client_id": "cli_8765432109.2222", 
-                "company_name": "Urban Supply Co",
-                "email": "orders@urbansupply.biz",
-                "phone": "+1-555-0234",
-                "approval_status": "active",
-                "credit": {
-                    "credit_limit": 60000,
-                    "credit_used": 35000
-                }
+                    "client_id": "cli_8765432109.2222", 
+                    "company_name": "Urban Supply Co",
+                    "email": "orders@urbansupply.biz",
+                    "phone": "+1-555-0234",
+                    "approval_status": "active",
+                    "credit": {
+                        "credit_limit": 60000,
+                        "credit_used": 35000
+                    }
                 },
                 {
-                "client_id": "cli_7654321098.3333",
-                "company_name": "PACIFIC RETAIL GROUP",
-                "email": "purchasing@pacificretail.com",
-                "phone": "+1-555-0345",
-                "approval_status": "pending",
-                "credit": {
-                    "credit_limit": 0,
-                    "credit_used": 0
-                }
+                    "client_id": "cli_7654321098.3333",
+                    "company_name": "PACIFIC RETAIL GROUP",
+                    "email": "purchasing@pacificretail.com",
+                    "phone": "+1-555-0345",
+                    "approval_status": "pending",
+                    "credit": {
+                        "credit_limit": 0,
+                        "credit_used": 0
+                    }
                 },
                 {
-                "client_id": "cli_6543210987.4444",
-                "company_name": "Midwest Manufacturing Inc",
-                "email": "procurement@midwest-mfg.com", 
-                "phone": "+1-555-0456",
-                "approval_status": "rejected",
-                "credit": {
-                    "credit_limit": 0,
-                    "credit_used": 0
-                }
+                    "client_id": "cli_6543210987.4444",
+                    "company_name": "Midwest Manufacturing Inc",
+                    "email": "procurement@midwest-mfg.com", 
+                    "phone": "+1-555-0456",
+                    "approval_status": "rejected",
+                    "credit": {
+                        "credit_limit": 0,
+                        "credit_used": 0
+                    }
                 }
             ],
             "orders": [
                 {
-                "client_id": "cli_9876543210.1111",
-                "amount": 35000,
-                "payment_status": "completed_on_time",
-                "created": 1734659051,
-                "external_order_id": "PO-2024-001",
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD",
-                "status": "completed"
+                    "client_id": "cli_9876543210.1111",
+                    "amount": 35000,
+                    "payment_status": "completed_on_time",
+                    "created": 1734659051,
+                    "external_order_id": "PO-2024-001",
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD",
+                    "status": "completed"
                 },
                 {
-                "client_id": "cli_8765432109.2222",
-                "amount": 22000,
-                "payment_status": "completed_late", 
-                "created": 1736285243,
-                "external_order_id": "PO-2024-002",
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD",
-                "status": "completed"
+                    "client_id": "cli_8765432109.2222",
+                    "amount": 22000,
+                    "payment_status": "completed_late", 
+                    "created": 1736285243,
+                    "external_order_id": "PO-2024-002",
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD",
+                    "status": "completed"
                 },
                 {
-                "client_id": "cli_9876543210.1111",
-                "amount": 40000,
-                "payment_status": "due",
-                "created": 1737384627,
-                "external_order_id": "PO-2024-003",
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD",
-                "status": "pending"
+                    "client_id": "cli_9876543210.1111",
+                    "amount": 40000,
+                    "payment_status": "due",
+                    "created": 1737384627,
+                    "external_order_id": "PO-2024-003",
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD",
+                    "status": "pending"
                 }
             ],
             "settlements": [
                 {
-                "amount": 34300,
-                "settlement_date": 1738866140,
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD",
-                "status": "completed",
-                "settlement_id": "set_abc123def456"
+                    "amount": 34300,
+                    "settlement_date": 1738866140,
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD",
+                    "status": "completed",
+                    "settlement_id": "set_abc123def456"
                 },
                 {
-                "amount": 21560,
-                "settlement_date": 1739212444,
-                "supplier_account": "sup_1234567890.123", 
-                "currency": "USD",
-                "status": "completed",
-                "settlement_id": "set_def456ghi789"
+                    "amount": 21560,
+                    "settlement_date": 1739212444,
+                    "supplier_account": "sup_1234567890.123", 
+                    "currency": "USD",
+                    "status": "completed",
+                    "settlement_id": "set_def456ghi789"
                 },
                 {
-                "amount": 39200,
-                "settlement_date": 1739816995,
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD", 
-                "status": "pending",
-                "settlement_id": "set_ghi789jkl012"
+                    "amount": 39200,
+                    "settlement_date": 1739816995,
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD", 
+                    "status": "pending",
+                    "settlement_id": "set_ghi789jkl012"
                 }
             ],
             "credit_requests": [
                 {
-                "client_id": "cli_9876543210.1111",
-                "request_total": 40000,
-                "expires": 1740700800,
-                "external_order_id": "PO-2024-003",
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD",
-                "description": "Industrial equipment purchase",
-                "status": 0,
-                "created": 1737395614
+                    "client_id": "cli_9876543210.1111",
+                    "request_total": 40000,
+                    "expires": 1740700800,
+                    "external_order_id": "PO-2024-003",
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD",
+                    "description": "Industrial equipment purchase",
+                    "status": 0,
+                    "created": 1737395614
                 },
                 {
-                "client_id": "cli_8765432109.2222",
-                "request_total": 18500,
-                "expires": 1741305600,
-                "external_order_id": "PO-2024-004",
-                "supplier_account": "sup_1234567890.123",
-                "currency": "USD",
-                "description": "Office supplies bulk order",
-                "status": 0,
-                "created": 1737482000
+                    "client_id": "cli_8765432109.2222",
+                    "request_total": 18500,
+                    "expires": 1741305600,
+                    "external_order_id": "PO-2024-004",
+                    "supplier_account": "sup_1234567890.123",
+                    "currency": "USD",
+                    "description": "Office supplies bulk order",
+                    "status": 0,
+                    "created": 1737482000
                 }
             ]
         }
@@ -465,7 +465,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": int(datetime.now().timestamp()),
         "active_threads": len(THREAD_STORAGE),
-        "api_version": "2.0 (Based on Logs)",
+        "api_version": "2.0 (Fixed Syntax)",
         "prompt_id": CREDIFLEX_PROMPT_ID
     }
 
