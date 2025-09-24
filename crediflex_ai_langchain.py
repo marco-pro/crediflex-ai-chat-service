@@ -199,10 +199,17 @@ async def chat_endpoint(request_data: Dict):
         # Get or create thread
         thread_id = request_data.get("thread_id")
         if not thread_id:
+            # Only create new thread if no thread_id provided
             thread_id = create_thread()
-        elif not get_thread(thread_id):
-            # Thread doesn't exist, create new one
-            thread_id = create_thread()
+        else:
+            # If thread_id provided but doesn't exist, recreate it with same ID
+            if not get_thread(thread_id):
+                THREAD_STORAGE[thread_id] = {
+                    "created_at": datetime.now(),
+                    "last_activity": datetime.now(),
+                    "messages": [],
+                    "context": {}
+                }
         
         # Get thread data
         thread = get_thread(thread_id)
