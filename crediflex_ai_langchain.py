@@ -33,14 +33,26 @@ class OpenAIResponsesClient:
             "Authorization": f"Bearer {api_key}"
         }
     
-    async def create_response(self, thread_id: str, input_text: str, context_data: Dict = None) -> Dict:
+    async def create_response(self, thread_id: str, input_text: str, context_data: Dict = None, thread_messages: List[Dict] = None) -> Dict:
         """Create a response using the Responses API with your dashboard-configured prompt"""
         
-        # Prepare the input with context
-        input_content = input_text
+        # Prepare the input with context and conversation history
+        input_content = ""
+        
+        # Add conversation history if available
+        if thread_messages and len(thread_messages) > 0:
+            conversation_history = "\n".join([
+                f"{'Usuario' if msg['role'] == 'user' else 'Asistente'}: {msg['content']}"
+                for msg in thread_messages[-10:]  # Last 10 messages for context
+            ])
+            input_content += f"HISTORIAL DE CONVERSACIÓN:\n{conversation_history}\n\n"
+        
+        # Add supplier context if available
         if context_data:
             supplier_summary = self._summarize_supplier_data(context_data)
-            input_content = f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\nPREGUNTA DEL USUARIO: {input_text}"
+            input_content += f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\n"
+        
+        input_content += f"PREGUNTA ACTUAL DEL USUARIO: {input_text}"
         
         # Use your dashboard prompt ID - prompt parameter expects an object
         payload = {
@@ -48,7 +60,7 @@ class OpenAIResponsesClient:
             "prompt": {
                 "id": CREDIFLEX_PROMPT_ID  # Prompt ID wrapped in object
             },
-            "input": input_content  # Just the user input
+            "input": input_content  # Full context including conversation history
         }
         
         async with httpx.AsyncClient() as client:
@@ -226,7 +238,8 @@ async def chat_endpoint(request_data: Dict):
         response_data = await openai_client.create_response(
             thread_id=thread_id,
             input_text=query,
-            context_data=context_data
+            context_data=context_data,
+            thread_messages=thread["messages"]  # Pass conversation history
         )
         
         # Extract response text based on Responses API structure
