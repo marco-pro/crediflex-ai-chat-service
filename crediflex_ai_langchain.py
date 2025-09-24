@@ -33,17 +33,19 @@ class OpenAIResponsesClient:
             "Authorization": f"Bearer {api_key}"
         }
     
-    async def create_response(self, thread_id: str, input_text: str, context_data: Dict = None, thread_messages: List[Dict] = None) -> Dict:
-        """Create a response using the Responses API with your dashboard-configured prompt"""
+    async def create_response(self, chat_thread_ai: str, input_text: str, context_data: Dict = None, thread_messages: List[Dict] = None) -> Dict:
+        """Create a response using the Responses API with conversation history injection"""
         
-        # Prepare the input with context and conversation history
+        # Build the complete input with conversation history
         input_content = ""
         
-        # Add conversation history if available
+        # Inject last N=5-10 messages as conversation history
         if thread_messages and len(thread_messages) > 0:
+            # Take last 10 messages for context
+            recent_messages = thread_messages[-10:]
             conversation_history = "\n".join([
                 f"{'Usuario' if msg['role'] == 'user' else 'Asistente'}: {msg['content']}"
-                for msg in thread_messages[-10:]  # Last 10 messages for context
+                for msg in recent_messages
             ])
             input_content += f"HISTORIAL DE CONVERSACIÓN:\n{conversation_history}\n\n"
         
@@ -52,6 +54,7 @@ class OpenAIResponsesClient:
             supplier_summary = self._summarize_supplier_data(context_data)
             input_content += f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\n"
         
+        # Always add current user query at the end
         input_content += f"PREGUNTA ACTUAL DEL USUARIO: {input_text}"
         
         # Use your dashboard prompt ID - prompt parameter expects an object
@@ -60,7 +63,7 @@ class OpenAIResponsesClient:
             "prompt": {
                 "id": CREDIFLEX_PROMPT_ID  # Prompt ID wrapped in object
             },
-            "input": input_content  # Full context including conversation history
+            "input": input_content  # Complete context with conversation history
         }
         
         async with httpx.AsyncClient() as client:
@@ -206,17 +209,17 @@ app.add_middleware(
 
 @app.post("/chat")
 async def chat_endpoint(request_data: Dict):
-    """Main chat endpoint using Responses API with thread management"""
+    """Main chat endpoint using Responses API with internal chat thread management"""
     try:
-        # Get or create thread
-        thread_id = request_data.get("thread_id")
-        if not thread_id:
-            # Only create new thread if no thread_id provided
-            thread_id = create_thread()
+        # Get or create internal chat thread
+        chat_thread_ai = request_data.get("chat_thread_ai")
+        if not chat_thread_ai:
+            # Generate new internal chat thread ID
+            chat_thread_ai = create_thread()
         else:
-            # If thread_id provided but doesn't exist, recreate it with same ID
-            if not get_thread(thread_id):
-                THREAD_STORAGE[thread_id] = {
+            # If chat_thread_ai provided but doesn't exist, recreate it with same ID
+            if not get_thread(chat_thread_ai):
+                THREAD_STORAGE[chat_thread_ai] = {
                     "created_at": datetime.now(),
                     "last_activity": datetime.now(),
                     "messages": [],
@@ -224,7 +227,7 @@ async def chat_endpoint(request_data: Dict):
                 }
         
         # Get thread data
-        thread = get_thread(thread_id)
+        thread = get_thread(chat_thread_ai)
         
         # Get user query
         query = request_data.get("query", "")
@@ -234,9 +237,9 @@ async def chat_endpoint(request_data: Dict):
         # Get context data
         context_data = request_data.get("context", {})
         
-        # Create response using OpenAI Responses API
+        # Create response using OpenAI Responses API with conversation history
         response_data = await openai_client.create_response(
-            thread_id=thread_id,
+            chat_thread_ai=chat_thread_ai,
             input_text=query,
             context_data=context_data,
             thread_messages=thread["messages"]  # Pass conversation history
@@ -267,11 +270,11 @@ async def chat_endpoint(request_data: Dict):
             response_text = "Lo siento, no pude generar una respuesta. Por favor, intenta de nuevo."
         
         # Update thread with new messages
-        update_thread(thread_id, query, response_text, context_data)
+        update_thread(chat_thread_ai, query, response_text, context_data)
         
         return {
             "response": response_text,
-            "thread_id": thread_id,
+            "chat_thread_ai": chat_thread_ai,  # Return internal chat thread ID
             "timestamp": int(datetime.now().timestamp()),
             "model": "gpt-4.1-mini (Dashboard Configured)",
             "status": "success",
@@ -426,41 +429,41 @@ async def test_endpoint(request_data: Dict):
     return await chat_endpoint(demo_data)
 
 # Thread management endpoints
-@app.get("/threads/{thread_id}")
-async def get_thread_info(thread_id: str):
+@app.get("/threads/{chat_thread_ai}")
+async def get_thread_info(chat_thread_ai: str):
     """Get thread information"""
-    thread = get_thread(thread_id)
+    thread = get_thread(chat_thread_ai)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     
     return {
-        "thread_id": thread_id,
+        "chat_thread_ai": chat_thread_ai,
         "created_at": thread["created_at"].isoformat(),
         "last_activity": thread["last_activity"].isoformat(),
         "message_count": len(thread["messages"]),
         "status": "success"
     }
 
-@app.get("/threads/{thread_id}/messages")
-async def get_thread_messages(thread_id: str):
+@app.get("/threads/{chat_thread_ai}/messages")
+async def get_thread_messages(chat_thread_ai: str):
     """Get thread messages"""
-    thread = get_thread(thread_id)
+    thread = get_thread(chat_thread_ai)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
     
     return {
-        "thread_id": thread_id,
+        "chat_thread_ai": chat_thread_ai,
         "messages": thread["messages"],
         "status": "success"
     }
 
-@app.delete("/threads/{thread_id}")
-async def delete_thread(thread_id: str):
+@app.delete("/threads/{chat_thread_ai}")
+async def delete_thread(chat_thread_ai: str):
     """Delete a thread"""
-    if thread_id not in THREAD_STORAGE:
+    if chat_thread_ai not in THREAD_STORAGE:
         raise HTTPException(status_code=404, detail="Thread not found")
     
-    del THREAD_STORAGE[thread_id]
+    del THREAD_STORAGE[chat_thread_ai]
     return {"message": "Thread deleted successfully", "status": "success"}
 
 @app.get("/threads")
@@ -468,9 +471,9 @@ async def list_threads():
     """List all active threads"""
     cleanup_expired_threads()
     threads = []
-    for thread_id, data in THREAD_STORAGE.items():
+    for chat_thread_ai, data in THREAD_STORAGE.items():
         threads.append({
-            "thread_id": thread_id,
+            "chat_thread_ai": chat_thread_ai,
             "created_at": data["created_at"].isoformat(),
             "last_activity": data["last_activity"].isoformat(),
             "message_count": len(data["messages"])
@@ -485,7 +488,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": int(datetime.now().timestamp()),
         "active_threads": len(THREAD_STORAGE),
-        "api_version": "2.0 (Fixed Syntax)",
+        "api_version": "2.0 (Internal Chat Thread AI)",
         "prompt_id": CREDIFLEX_PROMPT_ID
     }
 
