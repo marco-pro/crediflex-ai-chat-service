@@ -16,8 +16,8 @@ load_dotenv()
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = "https://api.openai.com/v1"
-# Your custom prompt ID from the dashboard
-CREDIFLEX_PROMPT_ID = "pmpt_68d1cdbd447081958a372a0c10fdf06001bdc9bb0333b459"
+# Your custom prompt ID from the dashboard - now from environment variable
+CREDIFLEX_PROMPT_ID = os.getenv("CREDIFLEX_PROMPT_ID", "pmpt_68d1cdbd447081958a372a0c10fdf06001bdc9bb0333b459")
 
 # Thread storage (in production, use Redis or database)
 THREAD_STORAGE = {}
