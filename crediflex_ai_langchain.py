@@ -294,6 +294,7 @@ async def test_endpoint(request_data: Dict):
     """Test endpoint with demo data"""
     demo_data = {
         "query": request_data.get("query", "¿Cómo va mi programa de crédito?"),
+        "chat_thread_ai": request_data.get("chat_thread_ai"),  # Pass through chat_thread_ai
         "context": {
             "business_clients": [
                 {
