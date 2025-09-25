@@ -33,37 +33,25 @@ class OpenAIResponsesClient:
             "Authorization": f"Bearer {api_key}"
         }
     
-    async def create_response(self, chat_thread_ai: str, input_text: str, context_data: Dict = None, thread_messages: List[Dict] = None) -> Dict:
-        """Create a response using the Responses API with conversation history injection"""
+    async def create_response(self, chat_thread_ai: str, input_text: str, context_data: Dict = None) -> Dict:
+        """Create a response using the Responses API with conversation field"""
         
-        # Build the complete input with conversation history
-        input_content = ""
-        
-        # Inject last N=5-10 messages as conversation history
-        if thread_messages and len(thread_messages) > 0:
-            # Take last 10 messages for context
-            recent_messages = thread_messages[-10:]
-            conversation_history = "\n".join([
-                f"{'Usuario' if msg['role'] == 'user' else 'Asistente'}: {msg['content']}"
-                for msg in recent_messages
-            ])
-            input_content += f"HISTORIAL DE CONVERSACIÓN:\n{conversation_history}\n\n"
+        # Build input with only current query and supplier context
+        input_content = input_text
         
         # Add supplier context if available
         if context_data:
             supplier_summary = self._summarize_supplier_data(context_data)
-            input_content += f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\n"
+            input_content = f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\nPREGUNTA ACTUAL DEL USUARIO: {input_text}"
         
-        # Always add current user query at the end
-        input_content += f"PREGUNTA ACTUAL DEL USUARIO: {input_text}"
-        
-        # Use your dashboard prompt ID - prompt parameter expects an object
+        # Use conversation field for OpenAI to manage conversation state
         payload = {
             "model": "gpt-4.1-mini",  # Your dashboard model
             "prompt": {
                 "id": CREDIFLEX_PROMPT_ID  # Prompt ID wrapped in object
             },
-            "input": input_content  # Complete context with conversation history
+            "input": input_content,  # Only current query and supplier context
+            "conversation": chat_thread_ai  # OpenAI manages conversation state
         }
         
         async with httpx.AsyncClient() as client:
@@ -151,7 +139,7 @@ def get_thread(thread_id: str) -> Optional[Dict]:
     return THREAD_STORAGE.get(thread_id)
 
 def update_thread(thread_id: str, user_message: str, assistant_response: str, context: Dict = None):
-    """Update thread with new messages"""
+    """Update thread metadata (messages stored for audit/debug only)"""
     if thread_id not in THREAD_STORAGE:
         return
     
@@ -162,7 +150,7 @@ def update_thread(thread_id: str, user_message: str, assistant_response: str, co
     if context:
         thread["context"] = context
     
-    # Add messages to thread
+    # Store messages for audit/debug purposes (not for context injection)
     thread["messages"].append({
         "role": "user",
         "content": user_message,
@@ -174,7 +162,7 @@ def update_thread(thread_id: str, user_message: str, assistant_response: str, co
         "timestamp": datetime.now().isoformat()
     })
     
-    # Keep only last 20 messages to prevent context overflow
+    # Keep only last 20 messages for audit purposes
     if len(thread["messages"]) > 20:
         thread["messages"] = thread["messages"][-20:]
 
@@ -237,12 +225,12 @@ async def chat_endpoint(request_data: Dict):
         # Get context data
         context_data = request_data.get("context", {})
         
-        # Create response using OpenAI Responses API with conversation history
+        # Create response using OpenAI Responses API with conversation field
         response_data = await openai_client.create_response(
             chat_thread_ai=chat_thread_ai,
             input_text=query,
-            context_data=context_data,
-            thread_messages=thread["messages"]  # Pass conversation history
+            context_data=context_data
+            # Removed: thread_messages - OpenAI now manages conversation state
         )
         
         # Extract response text based on Responses API structure
