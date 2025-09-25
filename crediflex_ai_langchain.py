@@ -124,8 +124,9 @@ MÉTRICAS GENERALES:
 
 # Thread management functions
 def create_thread():
-    """Create a new conversation thread"""
-    thread_id = str(uuid.uuid4())
+    """Create a new conversation thread with OpenAI-compatible ID"""
+    # Generate OpenAI-compatible conversation ID (must start with 'conv')
+    thread_id = f"conv_{str(uuid.uuid4())}"
     THREAD_STORAGE[thread_id] = {
         "created_at": datetime.now(),
         "last_activity": datetime.now(),
@@ -207,6 +208,9 @@ async def chat_endpoint(request_data: Dict):
         else:
             # If chat_thread_ai provided but doesn't exist, recreate it with same ID
             if not get_thread(chat_thread_ai):
+                # Ensure the ID is OpenAI-compatible (starts with 'conv')
+                if not chat_thread_ai.startswith('conv_'):
+                    chat_thread_ai = f"conv_{chat_thread_ai}"
                 THREAD_STORAGE[chat_thread_ai] = {
                     "created_at": datetime.now(),
                     "last_activity": datetime.now(),
