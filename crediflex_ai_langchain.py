@@ -33,7 +33,7 @@ class OpenAIResponsesClient:
             "Authorization": f"Bearer {api_key}"
         }
     
-    async def create_response(self, chat_thread_ai: str, input_text: str, context_data: Dict = None, is_new_conversation: bool = False) -> Dict:
+    async def create_response(self, chat_thread_ai: str, input_text: str, context_data: Dict = None) -> Dict:
         """Create a response using the Responses API with conversation field"""
         
         # Build input with only current query and supplier context
@@ -44,18 +44,15 @@ class OpenAIResponsesClient:
             supplier_summary = self._summarize_supplier_data(context_data)
             input_content = f"CONTEXTO DEL PROVEEDOR:\n{supplier_summary}\n\nPREGUNTA ACTUAL DEL USUARIO: {input_text}"
         
-        # Build payload - only include conversation field for existing conversations
+        # Use conversation field for OpenAI to manage conversation state
         payload = {
             "model": "gpt-4.1-mini",  # Your dashboard model
             "prompt": {
                 "id": CREDIFLEX_PROMPT_ID  # Prompt ID wrapped in object
             },
-            "input": input_content  # Only current query and supplier context
+            "input": input_content,  # Only current query and supplier context
+            "conversation": chat_thread_ai  # OpenAI manages conversation state
         }
-        
-        # Only add conversation field for existing conversations
-        if not is_new_conversation:
-            payload["conversation"] = chat_thread_ai
         
         async with httpx.AsyncClient() as client:
             try:
@@ -205,12 +202,9 @@ async def chat_endpoint(request_data: Dict):
     try:
         # Get or create internal chat thread
         chat_thread_ai = request_data.get("chat_thread_ai")
-        is_new_conversation = False
-        
         if not chat_thread_ai:
             # Generate new internal chat thread ID
             chat_thread_ai = create_thread()
-            is_new_conversation = True
         else:
             # If chat_thread_ai provided but doesn't exist, recreate it with same ID
             if not get_thread(chat_thread_ai):
@@ -223,7 +217,6 @@ async def chat_endpoint(request_data: Dict):
                     "messages": [],
                     "context": {}
                 }
-                is_new_conversation = True
         
         # Get thread data
         thread = get_thread(chat_thread_ai)
@@ -240,8 +233,8 @@ async def chat_endpoint(request_data: Dict):
         response_data = await openai_client.create_response(
             chat_thread_ai=chat_thread_ai,
             input_text=query,
-            context_data=context_data,
-            is_new_conversation=is_new_conversation
+            context_data=context_data
+            # Removed: thread_messages - OpenAI now manages conversation state
         )
         
         # Extract response text based on Responses API structure
